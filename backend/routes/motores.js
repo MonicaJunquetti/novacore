@@ -49,4 +49,31 @@ router.post("/", (req, res) => {
 
 });
 
+router.put("/:id", (req, res) => {
+  const { id } = req.params;
+
+  const { nome_motor, localizacao, numero_polos, rpm_nominal, potencia_motor } = req.body;
+
+  const sql = `
+    UPDATE tb_motores 
+    SET nome_motor = ?, localizacao = ?, numero_polos = ?, rpm_nominal = ?, potencia_motor = ?
+    WHERE id_motor = ?
+  `;
+
+  db.query(sql,
+    [nome_motor, localizacao, numero_polos, rpm_nominal, potencia_motor, id],
+    (err, result) => {
+
+      if (err) {
+        console.error(err);
+        return res.status(500).json({
+          erro: "Erro ao atualizar motor"
+        });
+      }
+
+      res.json({ mensagem: "Motor atualizado com sucesso" });
+    }
+  );
+});
+
 module.exports = router;
