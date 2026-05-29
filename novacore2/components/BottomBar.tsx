@@ -18,12 +18,18 @@ export default function BottomBar() {
         <Text style={styles.text}>Dashboard</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.item}>
+      <TouchableOpacity
+        style={styles.item}
+        onPress={() => router.push("/(tabs)/motores")}
+      >
         <MaterialIcons name="my-location" size={24} color="#fff" />
         <Text style={styles.text}>Motores</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.item}>
+      <TouchableOpacity
+        style={styles.item}
+        onPress={() => router.push("/(tabs)/editarperfil")}
+      >
         <MaterialIcons name="person" size={24} color="#fff" />
         <Text style={styles.text}>Perfil</Text>
       </TouchableOpacity>
@@ -35,12 +41,14 @@ const styles = StyleSheet.create({
   container: {
     
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-evenly",
+    alignItems: "center",
     backgroundColor: "#020617",
     padding: 15,
   },
 
   item: {
+  flex: 1,
   alignItems: "center", // 👈 isso coloca ícone em cima e texto embaixo
 },
   text: {

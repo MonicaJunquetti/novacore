@@ -48,4 +48,65 @@ router.post("/login", (req, res) => {
   });
 });
 
+// EDITAR PERFIL
+router.put("/editar/:id", async (req, res) => {
+  const { id } = req.params;
+  const { nome, email, senha } = req.body;
+  try {
+    // se vier senha nova
+    if (senha && senha.trim() !== "") {
+      const senhaHash = await bcrypt.hash(senha, 10);
+      const sql = `
+        UPDATE tb_usuarios
+        SET
+          nome_usuario = ?,
+          email_usuario = ?,
+          senha_usuario = ?
+        WHERE id_usuario = ?
+      `;
+      db.query(
+        sql,
+        [nome, email, senhaHash, id],
+        (err, result) => {
+
+          if (err)
+            return res.status(500).json(err);
+
+          res.json({
+            message: "Perfil atualizado!"
+          });
+        }
+      );
+    }
+    // sem alterar senha
+    else {
+
+      const sql = `
+        UPDATE tb_usuarios
+        SET
+          nome_usuario = ?,
+          email_usuario = ?
+        WHERE id_usuario = ?
+      `;
+      db.query(
+        sql,
+        [nome, email, id],
+        (err, result) => {
+
+          if (err)
+            return res.status(500).json(err);
+
+          res.json({
+            message: "Perfil atualizado!"
+          });
+        }
+      );
+    }
+  }
+
+  catch (error) {
+    res.status(500).json(error);
+  }
+});
+
 module.exports = router;

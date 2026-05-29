@@ -5,6 +5,7 @@ import Input from "../../components/Input";
 import Button from "../../components/Button2";
 import { useRouter } from "expo-router";
 import { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Login() {
   const router = useRouter();
@@ -12,33 +13,44 @@ export default function Login() {
   const [senha, setSenha] = useState("");
 
   const handleLogin = async () => {
-  console.log("Tentando login");
+    console.log("Tentando login");
+    try {
+      const response = await fetch(
+        "http://192.168.0.146:3000/usuarios/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            email,
+            senha
+          }),
+        }
+      );
+      console.log("Status:", response.status);
+      const data = await response.json();
+      console.log("Resposta do servidor:", data);
 
-  try {
-    const response = await fetch("http://192.168.0.146:3000/usuarios/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, senha }),
-    });
+      if (response.ok) {
+        console.log("Login OK");
+        // SALVA usuário logado
+        await AsyncStorage.setItem(
+          "usuario",
+          JSON.stringify(data.usuario)
+        );
+        router.push("/motores");
 
-    console.log("Status:", response.status);
+      } else {
+        console.log("Erro no login");
+        Alert.alert("Erro", data.message);
+      }
 
-    const data = await response.json();
-
-    console.log("Resposta do servidor:", data);
-
-    if (response.ok) {
-      console.log("Login OK");
-      router.push("/motores");
-    } else {
-      console.log("Erro no login");
-      Alert.alert("Erro", data.message);
+    } catch (error) {
+      console.log("Erro de conexão:", error);
     }
 
-  } catch (error) {
-    console.log("Erro de conexão:", error);
-  }
-};
+  };
 
   return (
     <Background>

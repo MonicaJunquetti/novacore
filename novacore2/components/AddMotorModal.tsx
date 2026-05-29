@@ -1,5 +1,14 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  Alert
+} from "react-native";
 import { useState, useEffect } from "react";
+import { MaterialIcons } from "@expo/vector-icons";
 
 type Motor = {
   id_motor: number
@@ -88,6 +97,25 @@ export default function AddMotorModal({ visible, onClose, atualizarLista, motorS
     }
   };
 
+  const removerMotor = async () => {
+    if (!motorSelecionado) return;
+    try {
+      const response = await fetch(
+        `http://192.168.0.146:3000/motores/${motorSelecionado.id_motor}`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Erro ao remover");
+      }
+      atualizarLista();
+      onClose();
+    } catch (error) {
+      console.log("ERRO AO REMOVER:", error);
+    }
+  };
+
   return (
 
     <Modal visible={visible} animationType="fade" transparent={true}>
@@ -124,9 +152,45 @@ export default function AddMotorModal({ visible, onClose, atualizarLista, motorS
           <Text style={styles.label}>kW</Text>
           <TextInput placeholder="Digite" placeholderTextColor="#ffffff" style={styles.input} value={kw} onChangeText={setKw} />
 
-          <TouchableOpacity style={styles.botao} onPress={salvarMotor}>
-            <Text style={styles.botaoTexto}>Salvar alterações</Text>
-          </TouchableOpacity>
+          <View style={styles.containerBotoes}>
+
+            <TouchableOpacity
+              style={styles.botao}
+              onPress={salvarMotor}
+            >
+              <Text style={styles.botaoTexto}>
+                Salvar alterações
+              </Text>
+            </TouchableOpacity>
+            {motorSelecionado && (
+              <TouchableOpacity
+                style={styles.botaoExcluir}
+                onPress={() => {
+                  Alert.alert(
+                    "Excluir motor",
+                    "Deseja realmente apagar este motor?",
+                    [
+                      {
+                        text: "Cancelar",
+                        style: "cancel"
+                      },
+                      {
+                        text: "Sim",
+                        style: "destructive",
+                        onPress: removerMotor
+                      }
+                    ]
+                  );
+                }}
+              >
+                <MaterialIcons
+                  name="delete"
+                  size={22}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+            )}
+          </View>
 
         </View>
 
@@ -151,6 +215,22 @@ const styles = StyleSheet.create({
   color: "#ffffff",
   marginBottom: 6,
   marginTop: 10,
+},
+
+containerBotoes: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 12,
+},
+
+botaoExcluir: {
+  width: 55,
+  height: 55,
+  borderRadius: 15,
+  backgroundColor: "#dc2626",
+  justifyContent: "center",
+  alignItems: "center",
+  marginTop: 20,
 },
 
   titulo:{
@@ -182,12 +262,14 @@ input: {
 },
 
   botao:{
-    backgroundColor:"#6C5DD2",
-    padding:15,
-    borderRadius:15,
-    alignItems:"center",
-    marginTop: 20,
-  },
+  flex: 1,
+  backgroundColor:"#6C5DD2",
+  padding:15,
+  borderRadius:15,
+  alignItems:"center",
+  justifyContent:"center",
+  marginTop: 20,
+},
 
   botaoTexto:{
     color:"#fff",

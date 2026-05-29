@@ -1,126 +1,204 @@
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import StatusIcon from "./StatusIcon";
-import { calcularStatus } from "./StatusMotor";
+import React from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+} from "react-native";
 
 type Props = {
+  status: "ok" | "alerta" | "critico";
   nome: string;
-  localizacao_setor: string;
   localizacao_bancada: string;
-  status: "ok" | "alerta" | "erro";
-  temperatura: number;
-  vibracao: number;
+  localizacao_setor: string;
 };
 
 export default function MotorCardAlert({
+  status,
   nome,
-  localizacao_setor,
   localizacao_bancada,
-  temperatura,
-  vibracao,
+  localizacao_setor,
 }: Props) {
 
-  const status = calcularStatus(temperatura, vibracao);
+  const bordaCard =
+    status === "critico"
+      ? "#ff4d4d"
+      : "#505050";
 
-  const borderColor =
-    status === "ok"
-      ? "#22c55e"
-      : status === "alerta"
-      ? "#eab308"
-      : "#ef4444";
+  const iconeTemp =
+  status === "alerta"
+    ? require("../assets/images/icone_alerta.png")
+    : require("../assets/images/icone_normal_cinza.png");
+
+  const iconeVib =
+    status === "critico"
+      ? require("../assets/images/icone_critico.png")
+      : require("../assets/images/icone_normal_cinza.png");
 
   return (
-    <View style={[styles.card, { borderColor }]}>
+  <View
+    style={[
+      styles.card,
+      { borderColor: bordaCard },
+    ]}
+  >
 
-      <View style={styles.left}>
-        <StatusIcon status={status} />
+    {/* TOPO */}
+    <View style={styles.topRow}>
+
+      <Text style={styles.nome}>
+        {nome}
+      </Text>
+
+      <Text style={styles.local}>
+        {localizacao_setor}
+      </Text>
+
+      <Text style={styles.local}>
+        {localizacao_bancada}
+      </Text>
+
+    </View>
+
+    {/* STATUS */}
+    <View style={styles.statusContainer}>
+
+      {/* TEMP */}
+      <View
+        style={[
+          styles.statusBox,
+          {
+            borderColor:
+              status === "alerta"
+                ? "#FFD000"
+                : "#505050",
+          },
+        ]}
+      >
+
+        <Image
+          source={iconeTemp}
+          style={styles.iconStatus}
+        />
 
         <View>
-          <Text style={styles.nome}>{nome}</Text>
-          <Text style={styles.local}>{localizacao_setor}</Text>
-          <Text style={styles.local}>{localizacao_bancada}</Text>
+          <Text style={styles.statusLabel}>
+            TEMP
+          </Text>
+
+          <Text style={styles.statusValue}>
+            0°C
+          </Text>
         </View>
+
       </View>
 
-      <View style={styles.info}>
-        <View style={styles.info_card}>
-          <Text style={styles.label}>TEMP</Text>
-          <Text style={styles.valor}>{temperatura}°C</Text>
+      {/* VIB */}
+      <View
+        style={[
+          styles.statusBox,
+          {
+            borderColor:
+              status === "critico"
+                ? "#ff5a52"
+                : "#505050",
+          },
+        ]}
+      >
+
+        <Image
+          source={iconeVib}
+          style={styles.iconStatus}
+        />
+
+        <View>
+          <Text style={styles.statusLabel}>
+            VIB
+          </Text>
+
+          <Text style={styles.statusValue}>
+            0.0 mm/s
+          </Text>
         </View>
 
-        <View style={styles.info_card}>
-          <Text style={styles.label}>VIB</Text>
-          <Text style={styles.valor}>{vibracao} mm/s</Text>
-        </View>
       </View>
 
     </View>
-  );
+
+  </View>
+);
 }
 
 const styles = StyleSheet.create({
 
-  card:{
-    borderWidth:1.5,
-    borderRadius:18,
-    padding:20,
-    marginBottom:14,
-    flexDirection:"row",
-    alignItems:"center",
-    justifyContent:"space-between",
-    width: '90%',
-    gap: '15%'
+  card: {
+    width: "90%",
+    backgroundColor: "#020817",
+    borderWidth: 2,
+    borderRadius: 24,
+
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+
+    marginBottom: 18,
+    marginLeft: 20,
   },
 
-  left:{
-    flexDirection:"row",
-    alignItems:"center",
-    flex:2
-  },
-
-  nome:{
-    color:"#fff",
-    fontWeight:"bold",
-    fontFamily: 'sans-serif'
-  },
-
-  local:{
-    color:"#ffffff",
-    fontSize:13,
-    marginTop: 2
-  },
-
-  info:{
-    flexDirection:"row",
-    gap:30,
-    flex:2,
-    justifyContent:"center",
-  },
-  info_card:{
-    justifyContent:"center",
+  topRow: {
+    flexDirection: "row",
     alignItems: "center",
-   
+    marginBottom: 22,
   },
 
-  label:{
-    color:"#ffffff",
-    fontSize:13
+  nome: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "bold",
+    marginRight: 14,
   },
 
-  valor:{
-    color:"#fff",
-    textAlign:"center"
+  local: {
+    color: "#fff",
+    fontSize: 14,
+    marginRight: 14,
   },
 
-  botao:{
-    borderWidth:1,
-    borderColor:"#475569",
-    paddingVertical:6,
-    paddingHorizontal:16,
-    borderRadius:8
+  statusContainer: {
+  flexDirection: "row",
+  gap: 14,
+
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+  statusBox: {
+  flexDirection: "row",
+  alignItems: "center",
+
+  borderWidth: 2,
+  borderRadius: 18,
+
+  paddingHorizontal: 14,
+  paddingVertical: 8,
+},
+
+  iconStatus: {
+    width: 16,
+    height: 16,
+    resizeMode: "contain",
+    marginRight: 10,
   },
 
-  botaoText:{
-    color:"#fff"
-  }
+  statusLabel: {
+    color: "#e5e5e5",
+    fontSize: 13,
+    marginRight: 10,
+  },
+
+  statusValue: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "bold",
+  },
 
 });
