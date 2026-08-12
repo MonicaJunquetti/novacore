@@ -7,7 +7,7 @@ type Props = {
 export default function StatusIcon({ status }: Props) {
 
   const icones = {
-    ok: require("../assets/images/icone_normal.png"),
+    ok: require("../assets/images/icone_normal_cinza.png"),
     alerta: require("../assets/images/icone_alerta.png"),
     erro: require("../assets/images/icone_critico.png"),
   };

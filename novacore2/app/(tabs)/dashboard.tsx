@@ -19,12 +19,31 @@ export default function HomeScreen() {
   // ==========================================
   // ESTADOS
   // ==========================================
-  const [filtroSelecionado, setFiltroSelecionado] = useState('Dia');
+  // Altere de 'Dia' para ''
+  const [filtroSelecionado, setFiltroSelecionado] = useState('');
   const [modalVisivel, setModalVisivel] = useState(false);
+  const [motores, setMotores] = useState([]);
+  const [tipoVisualizacao, setTipoVisualizacao] = useState<'carcaca' | 'enrolamento'>('carcaca');
+  const [labelsTemperatura, setLabelsTemperatura] = useState<string[]>([]);
+  const [labelsVibracao, setLabelsVibracao] = useState<string[]>([]);
   
   // Estado para armazenar os dados vindos do Backend
   const [dadosTemperatura, setDadosTemperatura] = useState([
-    { label: "Motor 1", dados: [0], cor: "#ca2020" }
+    { label: "Motor 1", dados: [0], cor: "#6C5DD1" }
+  ]);
+
+  const [contagemStatus, setContagemStatus] = useState({
+    normal: 0,
+    alerta: 0,
+    critico: 0
+  });
+
+  const [dadosVibracao, setDadosVibracao] = useState([
+    {
+      label: "Motor 1",
+      dados: [0],
+      cor: "#6C5DD1"
+    }
   ]);
 
   const filtros = ['Hora', 'Dia', 'Semana'];
@@ -34,28 +53,142 @@ export default function HomeScreen() {
   // ==========================================
   const buscarDadosDoServidor = async () => {
     try {
-      console.log("Tentando conectar ao servidor..."); // LOG 1
-      const response = await fetch('http://192.168.0.146:3000/sensor_temp/ultimos');
-      const json = await response.json();
 
-      console.log("Dados recebidos do banco:", json); // LOG 2 - IMPORTANTE
+      const url = `http://10.223.48.54:3000/sensor_temp/ultimos_temp?tipo=${tipoVisualizacao}&filtro=${filtroSelecionado}`;
+
+      console.log("Buscando:", tipoVisualizacao);
+
+      const response = await fetch(url);
+      console.log("Status HTTP:", response.status);
+      const json = await response.json();
+      console.log("JSON recebido:", JSON.stringify(json));
+
+      console.log("Dados recebidos:", json);
 
       if (json && json.length > 0) {
-        const valoresFormatados = json.map((item: any) => Number(item.valor)).reverse();
-        console.log("Valores processados para o gráfico:", valoresFormatados); // LOG 3
-        
-        setDadosTemperatura([
-          { 
-            label: "Motor 1", 
-            dados: valoresFormatados, 
-            cor: "#ca2020" 
+
+      const valoresFormatados = json.map(
+        (item: any) => Number(item.valor)
+      );
+
+      const labels = json.map(
+        (item: any) => item.ponto_escala
+      );
+
+      let labelsExibicao = [...labels];
+
+      if (filtroSelecionado === "" || filtroSelecionado === "Hora") {
+        const passo = Math.ceil(labels.length / 5);
+
+        labelsExibicao = labels.map((label, index) =>
+          index % passo === 0 ? label : ""
+        );
+      }
+
+      setLabelsTemperatura(labelsExibicao);
+
+      setDadosTemperatura([
+          {
+            label:
+              tipoVisualizacao === "enrolamento"
+                ? "Enrolamento"
+                : "Carcaça",
+
+            dados: valoresFormatados,
+
+            cor:
+              tipoVisualizacao === "enrolamento"
+                ? "#6C5DD1"
+                : "#6C5DD1"
           }
         ]);
-      } else {
-        console.log("O banco retornou um array vazio [].");
       }
+
     } catch (error) {
-      console.log("ERRO NA BUSCA:", error);
+      console.log("ERRO:", error);
+    }
+  };
+
+  const buscarContagemStatus = async () => {
+      try {
+
+        const response = await fetch(
+          "http://10.223.48.54:3000/motores/status-contagem"
+        );
+
+        const data = await response.json();
+
+        console.log(
+          "Contagem status:",
+          data
+        );
+
+        setContagemStatus({
+          normal: Number(data.normal || 0),
+          alerta: Number(data.alerta || 0),
+          critico: Number(data.critico || 0)
+        });
+
+      } catch (error) {
+
+        console.log(
+          "Erro ao buscar contagem:",
+          error
+        );
+
+      }
+    };
+
+  const buscarDadosVibracao = async () => {
+    try {
+
+      const response = await fetch(
+        `http://10.223.48.54:3000/sensores/ultimos-grafico?filtro=${filtroSelecionado}`
+      );
+
+      const json = await response.json();
+
+      console.log("Vibração recebida:", json);
+
+      if (json && json.length > 0) {
+
+        const valores = json.map(
+          (item: any) => Number(item.valor)
+        );
+
+        const labels = json.map(
+          (item: any) => item.ponto_escala
+        );
+
+        let labelsExibicao = [...labels];
+
+        if (filtroSelecionado === "" || filtroSelecionado === "Hora") {
+          const passo = Math.ceil(labels.length / 5);
+
+          labelsExibicao = labels.map((label, index) =>
+            index % passo === 0 ? label : ""
+          );
+        }
+
+        setLabelsVibracao(labelsExibicao);
+
+        setDadosVibracao([
+          {
+            label: "Motor 1",
+            dados: valores,
+            cor: "#6C5DD1"
+          }
+        ]);
+
+      }
+
+    } catch (error) {
+
+      console.log(
+        "Erro ao buscar vibração:",
+        error
+      );
+
     }
   };
 
@@ -104,7 +237,7 @@ export default function HomeScreen() {
   const buscarAlertas = async () => {
     try {
       const response = await fetch(
-        "http://192.168.0.146:3000/alertas"
+        "http://10.223.48.54:3000/alertas"
       );
       const data = await response.json();
       setAlertas(data);
@@ -156,16 +289,46 @@ export default function HomeScreen() {
     }
   };
 
+  const buscarMotores = async () => {
+    try {
+
+      const response = await fetch(
+        "http://10.223.48.54:3000/motores"
+      );
+
+      const data = await response.json();
+
+      setMotores(data);
+
+    } catch (error) {
+
+      console.log(
+        "Erro ao buscar motores:",
+        error
+      );
+
+    }
+  };
+
   // Ciclo de vida: Busca os dados ao abrir e atualiza a cada 5 segundos
   useEffect(() => {
     carregarNotificacoes();
     carregarUltimoId();
     buscarAlertas();
+    buscarMotores();
+
+    buscarDadosDoServidor(); // temperatura
+    buscarDadosVibracao();
+    buscarContagemStatus();
     const intervalo = setInterval(() => {
       buscarAlertas();
+      buscarMotores();
+      buscarDadosDoServidor();
+      buscarDadosVibracao();
+      buscarContagemStatus();
     }, 2000);
     return () => clearInterval(intervalo);
-  }, []);
+  }, [tipoVisualizacao, filtroSelecionado]);
 
   return (
 
@@ -229,7 +392,14 @@ export default function HomeScreen() {
             key={item}
             label={item}
             isSelected={filtroSelecionado === item}
-            onPress={() => setFiltroSelecionado(item)}
+            onPress={() => {
+              // Se clicar no que já está selecionado, limpa o filtro (Tempo Real)
+              if (filtroSelecionado === item) {
+                setFiltroSelecionado('');
+              } else {
+                setFiltroSelecionado(item);
+              }
+            }}
             style={styles.buttonFiltroTempo}
           />
         ))}
@@ -239,38 +409,86 @@ export default function HomeScreen() {
       <View style={styles.statusRow}>
         <CardStatus
           label="Normal"
-          icon={require('../../assets/images/icone_normal.png')}
-          data={1}
+          icon={require('../../assets/images/icone_normal_cinza.png')}
+          data={contagemStatus.normal}
         />
 
         <CardStatus
           label="Alerta"
           icon={require('../../assets/images/icone_alerta.png')}
-          data={0}
+          data={contagemStatus.alerta}
         />
 
         <CardStatus
           label="Crítico"
           icon={require('../../assets/images/icone_critico.png')}
-          data={0}
+          data={contagemStatus.critico}
         />
+      </View>
+
+      <View style={styles.botoesContainer}>
+
+        <TouchableOpacity
+          style={[
+            styles.botaoVisualizacao,
+            tipoVisualizacao === "carcaca" &&
+              styles.botaoAtivo
+          ]}
+          onPress={() =>
+            setTipoVisualizacao("carcaca")
+          }
+        >
+
+          <Text
+            style={[
+              styles.botaoTexto,
+              tipoVisualizacao === "carcaca" &&
+                styles.botaoTextoAtivo
+            ]}
+          >
+            Carcaça (Real)
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.botaoVisualizacao,
+            tipoVisualizacao === "enrolamento" &&
+              styles.botaoAtivo
+          ]}
+          onPress={() =>
+            setTipoVisualizacao("enrolamento")
+          }
+        >
+
+          <Text
+            style={[
+              styles.botaoTexto,
+              tipoVisualizacao === "enrolamento" &&
+                styles.botaoTextoAtivo
+            ]}
+          >
+            Enrolamento (Estimado)
+          </Text>
+        </TouchableOpacity>
+
       </View>
 
       {/* GRÁFICOS */}
       <CardGrafico
-        titulo="Temperatura (°C)"
+        titulo={
+          tipoVisualizacao === "enrolamento"
+            ? "Temperatura do Enrolamento (Estimada)"
+            : "Temperatura da Carcaça (Real)"
+        }
         linhas={dadosTemperatura}
+        labels={labelsTemperatura}
       />
 
       <CardGrafico
-        titulo="Vibração (m/s²) - Simulado"
-        linhas={[
-          {
-            label: "Motor 1",
-            dados: [10, 12, 11, 13, 10],
-            cor: "#2055ca"
-          }
-        ]}
+        titulo="Vibração (m/s²)"
+        linhas={dadosVibracao}
+        labels={labelsVibracao}
       />
 
       {/* ALERTAS */}
@@ -280,19 +498,21 @@ export default function HomeScreen() {
           Alertas ativos
         </Text>
 
-        <MotorCardAlert
-          status="critico"
-          nome="MTR-001"
-          localizacao_bancada="Bancada 1"
-          localizacao_setor="Setor A"
-        />
+        {motores.map((motor) => (
 
-        <MotorCardAlert
-          status="ok"
-          nome="MTR-001"
-          localizacao_bancada="Bancada 1"
-          localizacao_setor="Setor A"
-        />
+          <MotorCardAlert
+            key={motor.id_motor}
+            nome={motor.nome_motor}
+            localizacao_setor={motor.localizacao}
+
+            status_vibracao={motor.status_vibracao}
+            status_temperatura={motor.status_temperatura}
+
+            valor_vibracao={motor.valor_vibracao}
+            valor_temp={motor.valor_temp}
+          />
+
+        ))}
 
       </View>
 
@@ -351,6 +571,42 @@ scrollContent: {
     color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+
+  botoesContainer: {
+    flexDirection: 'row',
+    width: '91%',
+    gap: 12,
+    marginBottom: 15,
+  },
+
+  botaoVisualizacao: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#050B18',
+    borderWidth: 1,
+    borderColor: '#505050',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+  },
+
+  botaoAtivo: {
+    backgroundColor: '#6C5DD2',
+    borderColor: '#6C5DD2',
+  },
+
+  botaoTexto: {
+    color: '#aaa',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+
+  botaoTextoAtivo: {
+    color: '#ffffff',
   },
 
   container_filtros: {

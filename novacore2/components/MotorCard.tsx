@@ -22,7 +22,7 @@ export default function MotorCard({
 }: Props) {
   const borderColor =
     status === "ok"
-      ? "#22c55e"
+      ? "#505050"
       : status === "alerta"
       ? "#eab308"
       : "#ef4444";

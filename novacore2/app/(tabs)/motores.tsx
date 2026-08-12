@@ -74,7 +74,7 @@ export default function Motores() {
   const buscarAlertas = async () => {
     try {
       const response = await fetch(
-        "http://192.168.0.146:3000/alertas"
+        "http://10.223.48.54:3000/alertas"
       );
       const data = await response.json();
       setAlertas(data);
@@ -148,7 +148,7 @@ export default function Motores() {
  const buscarMotores = async () => {
   try {
 
-    const response = await fetch("http://192.168.0.146:3000/motores");
+    const response = await fetch("http://10.223.48.54:3000/motores");
 
     const data = await response.json();
 

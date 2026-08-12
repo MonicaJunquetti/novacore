@@ -21,6 +21,9 @@ app.use("/sensor_temp", sensorTempRoutes);
 const alertasRoutes = require("./routes/alertas");
 app.use("/alertas", alertasRoutes);
 
+const motoresStatusRoutes = require("./routes/motores_status");
+app.use("/motores", motoresStatusRoutes);
+
 app.listen(3000, () => {
   console.log("Servidor rodando na porta 3000");
 });

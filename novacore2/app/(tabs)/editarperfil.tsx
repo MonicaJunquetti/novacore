@@ -42,7 +42,7 @@ export default function EditarPerfil() {
     const buscarAlertas = async () => {
     try {
         const response = await fetch(
-        "http://192.168.0.146:3000/alertas"
+        "http://10.223.48.54:3000/alertas"
         );
         const data = await response.json();
         setAlertas(data);
@@ -146,6 +146,7 @@ export default function EditarPerfil() {
     };
 
     useEffect(() => {
+    carregarUsuario();
     carregarNotificacoes();
     carregarUltimoId();
     buscarAlertas();
@@ -162,7 +163,7 @@ export default function EditarPerfil() {
         }
         try {
             const response = await fetch(
-                `http://192.168.0.146:3000/usuarios/editar/${idUsuario}`,
+                `http://10.223.48.54:3000/usuarios/editar/${idUsuario}`,
                 {
                     method: "PUT",
                     headers: {

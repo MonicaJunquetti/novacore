@@ -16,7 +16,7 @@ export default function Login() {
     console.log("Tentando login");
     try {
       const response = await fetch(
-        "http://192.168.0.146:3000/usuarios/login",
+        "http://10.223.48.54:3000/usuarios/login",
         {
           method: "POST",
           headers: {
@@ -39,7 +39,7 @@ export default function Login() {
           "usuario",
           JSON.stringify(data.usuario)
         );
-        router.push("/motores");
+        router.push("/dashboard");
 
       } else {
         console.log("Erro no login");

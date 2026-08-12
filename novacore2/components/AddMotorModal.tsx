@@ -5,7 +5,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
-  Alert
+  Alert,
+  ScrollView
 } from "react-native";
 import { useState, useEffect } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -17,6 +18,17 @@ type Motor = {
   numero_polos: number
   rpm_nominal: number
   potencia_motor: number
+  classe_isolamento: string
+  voltagem_nominal: number
+  corrente_nominal: number
+  fator_potencia: number
+  rendimento: number
+  espessura_carcaca: number
+  area_conducao: number
+  condutividade_metal: number
+  raio_interno_carcaca: number
+  raio_externo_estator: number
+  comprimento_estator: number
 }
 
 type Props = {
@@ -33,6 +45,22 @@ export default function AddMotorModal({ visible, onClose, atualizarLista, motorS
   const [polos, setPolos] = useState("");
   const [rpm, setRpm] = useState("");
   const [kw, setKw] = useState("");
+  const [mostrarAvancado, setMostrarAvancado] = useState(false);
+  const [tensao, setTensao] = useState("");
+  const [corrente, setCorrente] = useState("");
+  const [fatorPotencia, setFatorPotencia] = useState("");
+  const [rendimento, setRendimento] = useState("");
+  const [espessuraParede, setEspessuraParede] = useState("");
+  const [areaTransferencia, setAreaTransferencia] = useState("");
+  const [condutividadeMetal, setCondutividadeMetal] = useState("");
+  const [raioInterno, setRaioInterno] = useState("");
+  const [comprimentoMotor, setComprimentoMotor] = useState("");
+  const [classeIsolamento, setClasseIsolamento] = useState("");
+  const [raioExternoEstator, setRaioExternoEstator] = useState("");
+
+  const formatarDecimal = (valor: any) => {
+    return valor != null ? String(parseFloat(valor)) : "";
+  };
 
   useEffect(() => {
     if (motorSelecionado) {
@@ -41,6 +69,18 @@ export default function AddMotorModal({ visible, onClose, atualizarLista, motorS
       setPolos(String(motorSelecionado.numero_polos));
       setRpm(String(motorSelecionado.rpm_nominal));
       setKw(String(motorSelecionado.potencia_motor));
+      setClasseIsolamento(motorSelecionado.classe_isolamento || "");
+      setTensao(formatarDecimal(motorSelecionado.voltagem_nominal));
+      setCorrente(formatarDecimal(motorSelecionado.corrente_nominal));
+      setFatorPotencia(formatarDecimal(motorSelecionado.fator_potencia));
+      setRendimento(formatarDecimal(motorSelecionado.rendimento));
+
+      setEspessuraParede(formatarDecimal(motorSelecionado.espessura_carcaca));
+      setAreaTransferencia(formatarDecimal(motorSelecionado.area_conducao));
+      setCondutividadeMetal(formatarDecimal(motorSelecionado.condutividade_metal));
+      setRaioInterno(formatarDecimal(motorSelecionado.raio_interno_carcaca));
+      setComprimentoMotor(formatarDecimal(motorSelecionado.comprimento_estator));
+      setRaioExternoEstator(formatarDecimal(motorSelecionado.raio_externo_estator));
     } else {
       // limpa quando for cadastro novo
       setNome("");
@@ -48,14 +88,15 @@ export default function AddMotorModal({ visible, onClose, atualizarLista, motorS
       setPolos("");
       setRpm("");
       setKw("");
+      setRaioExternoEstator("");
     }
   }, [motorSelecionado, visible]);
 
   const salvarMotor = async () => {
 
     const url = motorSelecionado
-      ? `http://192.168.0.146:3000/motores/${motorSelecionado.id_motor}`
-      : "http://192.168.0.146:3000/motores";
+      ? `http://10.223.48.54:3000/motores/${motorSelecionado.id_motor}`
+      : "http://10.223.48.54:3000/motores";
 
     const method = motorSelecionado ? "PUT" : "POST";
 
@@ -77,7 +118,19 @@ export default function AddMotorModal({ visible, onClose, atualizarLista, motorS
           localizacao: localizacao,
           numero_polos: Number(polos),
           rpm_nominal: Number(rpm),
-          potencia_motor: Number(kw)
+          potencia_motor: Number(kw),
+          classe_isolamento: classeIsolamento,
+          voltagem_nominal: tensao ? Number(tensao) : null,
+          corrente_nominal: corrente ? Number(corrente) : null,
+          fator_potencia: fatorPotencia ? Number(fatorPotencia) : null,
+          rendimento: rendimento ? Number(rendimento) : null,
+
+          espessura_carcaca: espessuraParede ? Number(espessuraParede) : null,
+          area_conducao: areaTransferencia ? Number(areaTransferencia) : null,
+          condutividade_metal: condutividadeMetal ? Number(condutividadeMetal) : null,
+          raio_interno_carcaca: raioInterno ? Number(raioInterno) : null,
+          raio_externo_estator: raioExternoEstator ? Number(raioExternoEstator) : null,
+          comprimento_estator: comprimentoMotor ? Number(comprimentoMotor) : null,
         })
       });
 
@@ -101,7 +154,7 @@ export default function AddMotorModal({ visible, onClose, atualizarLista, motorS
     if (!motorSelecionado) return;
     try {
       const response = await fetch(
-        `http://192.168.0.146:3000/motores/${motorSelecionado.id_motor}`,
+        `http://10.223.48.54:3000/motores/${motorSelecionado.id_motor}`,
         {
           method: "DELETE",
         }
@@ -123,6 +176,12 @@ export default function AddMotorModal({ visible, onClose, atualizarLista, motorS
     <View style={styles.overlay}>
 
         <View style={styles.modalBox}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingBottom: 20,
+            }}
+          >
 
           <TouchableOpacity style={styles.botaoFechar} onPress={onClose}>
             <Text style={styles.textoFechar}>✕</Text>
@@ -151,6 +210,189 @@ export default function AddMotorModal({ visible, onClose, atualizarLista, motorS
           {/* kW */}
           <Text style={styles.label}>kW</Text>
           <TextInput placeholder="Digite" placeholderTextColor="#ffffff" style={styles.input} value={kw} onChangeText={setKw} />
+
+          <TouchableOpacity
+            style={styles.botaoAvancado}
+            onPress={() =>
+              setMostrarAvancado(!mostrarAvancado)
+            }
+          >
+            <MaterialIcons
+              name="build"
+              size={20}
+              color="#fff"
+            />
+
+            <Text style={styles.textoAvancado}>
+              Configurações avançadas
+            </Text>
+
+            <MaterialIcons
+              name={
+                mostrarAvancado
+                  ? "keyboard-arrow-up"
+                  : "keyboard-arrow-down"
+              }
+              size={22}
+              color="#fff"
+            />
+          </TouchableOpacity>
+
+          {mostrarAvancado && (
+            <>
+
+              <Text style={styles.label}
+              style={[
+                styles.label,
+                { marginTop: 25 }
+              ]}>
+                Tensão (Voltagem)
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Digite"
+                placeholderTextColor="#fff"
+                value={tensao}
+                onChangeText={setTensao}
+              />
+
+              <Text style={styles.label}>
+                Corrente Elétrica
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Digite"
+                placeholderTextColor="#fff"
+                value={corrente}
+                onChangeText={setCorrente}
+              />
+
+              <Text style={styles.label}>
+                Fator de Potência
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Digite"
+                placeholderTextColor="#fff"
+                value={fatorPotencia}
+                onChangeText={setFatorPotencia}
+              />
+
+              <Text style={styles.label}>
+                Rendimento (eta)
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Digite"
+                placeholderTextColor="#fff"
+                value={rendimento}
+                onChangeText={setRendimento}
+              />
+
+              <Text style={styles.label}>
+                Classe de Isolamento
+              </Text>
+
+              <View style={styles.containerClasses}>
+                {["A", "B", "F", "H"].map((classe) => (
+                  <TouchableOpacity
+                    key={classe}
+                    style={[
+                      styles.botaoClasse,
+                      classeIsolamento === classe && styles.botaoClasseSelecionado
+                    ]}
+                    onPress={() => setClasseIsolamento(classe)}
+                  >
+                    <Text
+                      style={[
+                        styles.textoClasse,
+                        classeIsolamento === classe && styles.textoClasseSelecionado
+                      ]}
+                    >
+                      {classe}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.label}>
+                Espessura da parede
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Digite"
+                placeholderTextColor="#fff"
+                value={espessuraParede}
+                onChangeText={setEspessuraParede}
+              />
+
+              <Text style={styles.label}>
+                Área de transferência
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Digite"
+                placeholderTextColor="#fff"
+                value={areaTransferencia}
+                onChangeText={setAreaTransferencia}
+              />
+
+              <Text style={styles.label}>
+                Condutividade do metal
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Digite"
+                placeholderTextColor="#fff"
+                value={condutividadeMetal}
+                onChangeText={setCondutividadeMetal}
+              />
+
+              <Text style={styles.label}>
+                Raio interno da carcaça
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Digite"
+                placeholderTextColor="#fff"
+                value={raioInterno}
+                onChangeText={setRaioInterno}
+              />
+
+              <Text style={styles.label}>
+                Raio externo do estator
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Digite"
+                placeholderTextColor="#fff"
+                value={raioExternoEstator}
+                onChangeText={setRaioExternoEstator}
+              />
+
+              <Text style={styles.label}>
+                Comprimento do motor
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Digite"
+                placeholderTextColor="#fff"
+                value={comprimentoMotor}
+                onChangeText={setComprimentoMotor}
+              />
+
+            </>
+          )}
 
           <View style={styles.containerBotoes}>
 
@@ -192,6 +434,7 @@ export default function AddMotorModal({ visible, onClose, atualizarLista, motorS
             )}
           </View>
 
+          </ScrollView>
         </View>
 
     </View>
@@ -236,7 +479,7 @@ botaoExcluir: {
   titulo:{
     color:"#fff",
     fontSize:18,
-    marginBottom:30,
+    marginBottom:10,
     fontWeight: "bold",
   },
 
@@ -268,7 +511,27 @@ input: {
   borderRadius:15,
   alignItems:"center",
   justifyContent:"center",
-  marginTop: 20,
+  marginTop: 10,
+},
+
+botaoAvancado: {
+  height: 55,
+  borderRadius: 15,
+  borderWidth: 1,
+  borderColor: "#6C5DD2",
+  marginTop: 15,
+
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+
+  gap: 10,
+},
+
+textoAvancado: {
+  color: "#fff",
+  fontSize: 16,
+  fontWeight: "600",
 },
 
   botaoTexto:{
@@ -278,8 +541,8 @@ input: {
   },
   botaoFechar: {
   position: "absolute",
-  top: 25,
-  right: 25,
+  top: -1,
+  right: 10,
   zIndex: 1,
 },
 
@@ -298,11 +561,45 @@ overlay: {
 
 modalBox: {
   width: "90%",
+  maxHeight: "90%",
   backgroundColor: "#020617",
   borderRadius: 20,
   padding: 20,
   borderWidth: 1,          // espessura da borda
   borderColor: "#505050",
+},
+
+containerClasses: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  marginBottom: 10,
+},
+
+botaoClasse: {
+  flex: 1,
+  height: 50,
+  marginHorizontal: 4,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: "#505050",
+  backgroundColor: "#1A1D26",
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+botaoClasseSelecionado: {
+  backgroundColor: "#6C5DD2",
+  borderColor: "#6C5DD2",
+},
+
+textoClasse: {
+  color: "#fff",
+  fontWeight: "600",
+},
+
+textoClasseSelecionado: {
+  color: "#fff",
+  fontWeight: "bold",
 },
 
 });

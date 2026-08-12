@@ -11,15 +11,20 @@ type DadosLinha = {
 type CardGraficoProps = {
     titulo: string;
     linhas: DadosLinha[];
+    labels?: string[];
 };
 
-export function CardGrafico({ titulo, linhas }: CardGraficoProps) {
+export function CardGrafico({
+    titulo,
+    linhas,
+    labels = []
+}: CardGraficoProps) {
     const screenWidth = Dimensions.get("window").width;
     const screenHeight = Dimensions.get("window").height;
 
     // Removemos a propriedade 'legend' daqui para desativar a legenda nativa no topo
     const data = {
-        labels: linhas[0]?.dados.map((_, index) => `${index + 1}`) || [],
+        labels,
         datasets: linhas.map(linha => ({
             data: linha.dados,
             color: (opacity = 1) => linha.cor,
@@ -55,7 +60,8 @@ export function CardGrafico({ titulo, linhas }: CardGraficoProps) {
                 }}
                 style={{
                     marginTop: 30, 
-                    backgroundColor: "transparent"
+                    backgroundColor: "transparent",
+                    marginLeft: -30,
                 }}
             />
 
@@ -75,7 +81,7 @@ export function CardGrafico({ titulo, linhas }: CardGraficoProps) {
 const styles = StyleSheet.create({
     card_container: {
         width: '91%',
-        height: '27%', 
+        height: '26%', 
         paddingBottom: 10,
         borderRadius: 12,
         backgroundColor: '#0C101A',
@@ -97,7 +103,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'center',
-        marginTop: 10,
+        marginTop: -15,
         width: '100%',
     },
     legendItem: {

@@ -14,7 +14,7 @@ export default function Cadastro() {
 
   const handleCadastro = async () => {
     try {
-      const response = await fetch("http://192.168.0.146:3000/usuarios/cadastro", { // use 10.0.2.2 no Android emulator
+      const response = await fetch("http://10.223.48.54:3000/usuarios/cadastro", { // use 10.0.2.2 no Android emulator
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nome, email, senha }),

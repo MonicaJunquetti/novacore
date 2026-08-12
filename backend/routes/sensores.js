@@ -20,7 +20,7 @@ const pool = mysql.createPool({
 // CONFIGURAÇÕES
 // ==========================================
 
-const TAM_BUFFER = 80;
+const TAM_BUFFER = 20;
 const LIMITE_RUIDO = 0.3;
 const ALPHA = 0.98;
 
@@ -59,7 +59,7 @@ let ultimoEstadoSalvo = "ok";
 // KALMAN
 // ==========================================
 
-let Q = 0.05;
+let Q = 0.1;
 let R = 0.5;
 
 let x_estX = 0;
@@ -224,6 +224,10 @@ router.get("/dados", async (req, res) => {
         filtroY = Math.max(Math.min(filtroY, 8), -8);
         filtroZ = Math.max(Math.min(filtroZ, 8), -8);
 
+        filtroX = filtro(filtroX, 0.2);
+        filtroY = filtro(filtroY, 0.2);
+        filtroZ = filtro(filtroZ, 0.2);
+
         // ==========================
         // BUFFER E RMS (O restante permanece igual)
         // ==========================
@@ -248,7 +252,6 @@ router.get("/dados", async (req, res) => {
         );
 
         console.log("TOTAL:", total);
-
         // ... (Mantenha o código daqui para baixo exatamente como estava para salvar no Banco de Dados)
 
         // ==========================
@@ -257,11 +260,10 @@ router.get("/dados", async (req, res) => {
 
         if (estadoAtual === "ok") {
 
-            if (total >= 1.5 && total < 4) {
+            if (total >= 2.0 && total < 3.5) {
                 estadoAtual = "alerta";
             }
-
-            else if (total >= 4) {
+            else if (total >= 3.5) {
                 estadoAtual = "erro";
             }
 
@@ -269,11 +271,10 @@ router.get("/dados", async (req, res) => {
 
         else if (estadoAtual === "alerta") {
 
-            if (total < 1.2) {
+            if (total < 2.0) {
                 estadoAtual = "ok";
             }
-
-            else if (total >= 4) {
+            else if (total >= 3.5) {
                 estadoAtual = "erro";
             }
 
@@ -281,15 +282,9 @@ router.get("/dados", async (req, res) => {
 
         else if (estadoAtual === "erro") {
 
-            if (total < 3.5) {
+            if (total < 3.0) {
                 estadoAtual = "alerta";
             }
-
-        }
-
-        if (estadoAtual === "ok") {
-
-            ultimoEstadoSalvo = "ok";
 
         }
 
@@ -408,33 +403,87 @@ router.get("/dados", async (req, res) => {
 // BUSCAR ÚLTIMOS DADOS
 // ==========================================
 
-router.get("/ultimos", async (req, res) => {
-
+// ==========================================
+// ROTA: ENVIAR HISTÓRICO DE VIBRAÇÃO COM FILTRO
+// ==========================================
+router.get("/ultimos-grafico", async (req, res) => {
     try {
+        const filtro = req.query.filtro; // Recebe: 'Hora', 'Dia', 'Semana' ou undefined
+        const idMotor = parseInt(req.query.motor) || 1; // Padrão motor 1 se não enviado
+        
+        let querySql = "";
+        let queryParams = [idMotor];
 
-        const [dados] = await pool.query(
-            `
-            SELECT *
-            FROM tb_dados
-            ORDER BY horario DESC
-            LIMIT 20
-            `
-        );
+        if (filtro === 'Hora') {
+            // Última 1 hora -> Média de minuto em minuto
+            querySql = `
+                SELECT 
+                    DATE_FORMAT(horario, '%H:%i') as ponto_escala,
+                    AVG(valor) as valor
+                FROM tb_dados 
+                WHERE fk_motor = ? AND fk_sensor = 1
+                  AND horario >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+                GROUP BY MINUTE(horario), HOUR(horario)
+                ORDER BY MINUTE(horario) ASC
+            `;
+        } else if (filtro === 'Dia') {
+            // Últimas 24 horas -> Média de hora em hora
+            querySql = `
+                SELECT 
+                    DATE_FORMAT(horario, '%H:00') as ponto_escala,
+                    AVG(valor) as valor
+                FROM tb_dados 
+                WHERE fk_motor = ? AND fk_sensor = 1
+                  AND horario >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                GROUP BY HOUR(horario), DAY(horario)
+                ORDER BY horario ASC
+            `;
+        } else if (filtro === 'Semana') {
+            // Últimos 7 dias -> Média por Dia da Semana
+            querySql = `
+                SELECT 
+                    CASE DAYOFWEEK(horario)
+                        WHEN 1 THEN 'Dom' WHEN 2 THEN 'Seg' WHEN 3 THEN 'Ter'
+                        WHEN 4 THEN 'Qua' WHEN 5 THEN 'Qui' WHEN 6 THEN 'Sex' WHEN 7 THEN 'Sáb'
+                    END as ponto_escala,
+                    AVG(valor) as valor
+                FROM tb_dados 
+                WHERE fk_motor = ? AND fk_sensor = 1
+                  AND horario >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                GROUP BY DAYOFWEEK(horario), DATE(horario)
+                ORDER BY DATE(horario) ASC
+            `;
+        } else {
+            // ====================================================================
+            // TEMPO REAL (Nenhum filtro selecionado)
+            // Retorna os últimos 20 registros sem agrupamento
+            // ====================================================================
+            querySql = `
+                SELECT
+                    DATE_FORMAT(horario, '%H:%i') as ponto_escala,
+                    valor
+                FROM tb_dados
+                WHERE fk_motor = ? AND fk_sensor = 1
+                ORDER BY horario DESC
+                LIMIT 20
+            `;
+        }
+
+        let [dados] = await pool.query(querySql, queryParams);
+
+        // Se for Tempo Real, precisamos inverter o array para o gráfico renderizar da esquerda para a direita (cronológico)
+        if (!filtro) {
+            dados = dados.reverse();
+        }
 
         res.json(dados);
 
-    }
-
-    catch (erro) {
-
-        console.log(erro);
-
+    } catch (erro) {
+        console.error("Erro ao buscar vibração:", erro);
         res.status(500).json({
-            erro: "Erro ao buscar dados"
+            erro: "Erro ao buscar vibração"
         });
-
     }
-
 });
 
 

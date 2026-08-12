@@ -7,33 +7,58 @@ import {
 } from "react-native";
 
 type Props = {
-  status: "ok" | "alerta" | "critico";
+  status_vibracao: "ok" | "alerta" | "erro";
+  status_temperatura: "ok" | "alerta" | "erro";
+
+  valor_vibracao: number;
+  valor_temp: number;
+
   nome: string;
-  localizacao_bancada: string;
+  localizacao_bancada?: string;
   localizacao_setor: string;
 };
 
 export default function MotorCardAlert({
-  status,
+  status_vibracao,
+  status_temperatura,
+  valor_vibracao,
+  valor_temp,
   nome,
   localizacao_bancada,
   localizacao_setor,
 }: Props) {
 
+  console.log(
+    "Motor:",
+    nome,
+    "| Temp:",
+    status_temperatura,
+    "| Vib:",
+    status_vibracao
+  );
+
   const bordaCard =
-    status === "critico"
-      ? "#ff4d4d"
-      : "#505050";
+  status_vibracao === "erro" ||
+  status_temperatura === "erro"
+    ? "#ff4d4d"
+    : status_vibracao === "alerta" ||
+      status_temperatura === "alerta"
+    ? "#FFD000"
+    : "#505050";
 
   const iconeTemp =
-  status === "alerta"
+  status_temperatura === "erro"
+    ? require("../assets/images/icone_critico.png")
+    : status_temperatura === "alerta"
     ? require("../assets/images/icone_alerta.png")
     : require("../assets/images/icone_normal_cinza.png");
 
   const iconeVib =
-    status === "critico"
-      ? require("../assets/images/icone_critico.png")
-      : require("../assets/images/icone_normal_cinza.png");
+  status_vibracao === "erro"
+    ? require("../assets/images/icone_critico.png")
+    : status_vibracao === "alerta"
+    ? require("../assets/images/icone_alerta.png")
+    : require("../assets/images/icone_normal_cinza.png");
 
   return (
   <View
@@ -69,9 +94,11 @@ export default function MotorCardAlert({
           styles.statusBox,
           {
             borderColor:
-              status === "alerta"
-                ? "#FFD000"
-                : "#505050",
+            status_temperatura === "erro"
+              ? "#ff5a52"
+              : status_temperatura === "alerta"
+              ? "#FFD000"
+              : "#505050"
           },
         ]}
       >
@@ -87,7 +114,7 @@ export default function MotorCardAlert({
           </Text>
 
           <Text style={styles.statusValue}>
-            0°C
+            {Number(valor_temp || 0).toFixed(1)}°C
           </Text>
         </View>
 
@@ -99,9 +126,11 @@ export default function MotorCardAlert({
           styles.statusBox,
           {
             borderColor:
-              status === "critico"
-                ? "#ff5a52"
-                : "#505050",
+            status_vibracao === "erro"
+              ? "#ff5a52"
+              : status_vibracao === "alerta"
+              ? "#FFD000"
+              : "#505050"
           },
         ]}
       >
@@ -117,7 +146,7 @@ export default function MotorCardAlert({
           </Text>
 
           <Text style={styles.statusValue}>
-            0.0 mm/s
+            {Number(valor_vibracao || 0).toFixed(2)} m/s²
           </Text>
         </View>
 
