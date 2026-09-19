@@ -1,6 +1,6 @@
 <div style="display: flex; align-items: center; gap: 25px;">
 
-  <img src="novacore2/assets/images/novacore.png" alt="Logo NovaCore" width="250">
+  <h1 align="center">NovaCore</h1>
   <br>
 
   <div>
