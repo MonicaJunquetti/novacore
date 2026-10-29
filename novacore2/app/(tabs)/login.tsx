@@ -7,6 +7,8 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -16,7 +18,7 @@ export default function Login() {
     console.log("Tentando login");
     try {
       const response = await fetch(
-        "http://10.223.48.54:3000/usuarios/login",
+        `${API_URL}/usuarios/login`,
         {
           method: "POST",
           headers: {

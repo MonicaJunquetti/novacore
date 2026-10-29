@@ -28,7 +28,7 @@ export default function BottomBar() {
 
       <TouchableOpacity
         style={styles.item}
-        onPress={() => router.push("/(tabs)/editarperfil")}
+        onPress={() => router.push("/(tabs)/perfil")}
       >
         <MaterialIcons name="person" size={24} color="#fff" />
         <Text style={styles.text}>Perfil</Text>

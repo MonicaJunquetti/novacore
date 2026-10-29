@@ -9,6 +9,7 @@ type Props = {
   kw: number;
   status: "ok" | "alerta" | "erro";
   onEditar: () => void;
+  onVisualizarCondicoes: () => void;
 };
 
 export default function MotorCard({
@@ -18,7 +19,8 @@ export default function MotorCard({
   rpm,
   kw,
   status,
-  onEditar, 
+  onEditar,
+  onVisualizarCondicoes, 
 }: Props) {
   const borderColor =
     status === "ok"
@@ -61,10 +63,15 @@ export default function MotorCard({
         </View>
       </View>
 
+    <View style={styles.botoes}>
       <TouchableOpacity onPress={onEditar} style={styles.botao}>
         <Text style={styles.botaoText}>Editar</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity onPress={onVisualizarCondicoes} style={styles.botao}>
+        <Text style={styles.botaoText}>Visualizar condição</Text>
+      </TouchableOpacity>
+    </View>
     </View>
   );
 }
@@ -75,7 +82,13 @@ const styles = StyleSheet.create({
   marginLeft: 16, // 👈 espaço entre ícone e texto
   flex: 1,
 },
-
+  botoes:{
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10
+  },
   card:{
     backgroundColor:"#020617",
   borderWidth:1.5,
@@ -131,15 +144,15 @@ infoText: {
   },
 
   botao:{
-  width: 260,
-  marginTop: 16,
-  alignSelf: "center",
-  borderWidth:1,
-  borderColor:"#505050",
-  paddingVertical:6,
-  paddingHorizontal:16,
-  borderRadius:8,
-  alignItems: "center",
+    width: "50%",
+    marginTop: 16,
+    alignSelf: "center",
+    borderWidth:1,
+    borderColor:"#505050",
+    paddingVertical:6,
+    paddingHorizontal:16,
+    borderRadius:8,
+    alignItems: "center",
   },
 
   botaoText:{

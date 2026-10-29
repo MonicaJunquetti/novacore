@@ -30,10 +30,8 @@ const styles = StyleSheet.create({
     flexDirection:"row",
     alignItems:"center",
     backgroundColor:"#020617",
-    
     paddingHorizontal:14,
-    width:160,
-
+    width: "100%",
     borderWidth: 1,              // 🔥 CORRETO
     borderColor:"#505050",
     borderRadius:10,

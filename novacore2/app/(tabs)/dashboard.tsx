@@ -1,36 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, Dimensions, TouchableOpacity, Modal, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { CardStatus } from '@/components/CardStatus';
 import { CardGrafico } from '@/components/CardGraficoHistograma';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { BotaoFiltro } from '@/components/BotaoFiltro';
 import MotorCardAlert from '@/components/CardMotorAlerta';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import BottomBar from "../../components/BottomBar";
-import { Platform } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import NotificationModal from "../../components/NotificationModal";
-import { useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useDashboard } from "@/context/DashboardContext";
+import { useRouter } from "expo-router";
 
-const { width: screenWidth } = Dimensions.get('window');
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const { plantaAtiva, setPlantaAtiva } = useDashboard();
+
   // ==========================================
   // ESTADOS
   // ==========================================
-  // Altere de 'Dia' para ''
   const [filtroSelecionado, setFiltroSelecionado] = useState('');
-  const [modalVisivel, setModalVisivel] = useState(false);
   const [motores, setMotores] = useState([]);
   const [tipoVisualizacao, setTipoVisualizacao] = useState<'carcaca' | 'enrolamento'>('carcaca');
   const [labelsTemperatura, setLabelsTemperatura] = useState<string[]>([]);
   const [labelsVibracao, setLabelsVibracao] = useState<string[]>([]);
-  
-  // Estado para armazenar os dados vindos do Backend
-  const [dadosTemperatura, setDadosTemperatura] = useState([
-    { label: "Motor 1", dados: [0], cor: "#6C5DD1" }
-  ]);
+
+  // DADOS DOS SENSORES
+  const [dadosTemperatura, setDadosTemperatura] = useState<any[]>([]);
+  const [dadosVibracao, setDadosVibracao] = useState<any[]>([]);
 
   const [contagemStatus, setContagemStatus] = useState({
     normal: 0,
@@ -38,196 +35,189 @@ export default function HomeScreen() {
     critico: 0
   });
 
-  const [dadosVibracao, setDadosVibracao] = useState([
-    {
-      label: "Motor 1",
-      dados: [0],
-      cor: "#6C5DD1"
-    }
-  ]);
+  const [alertas, setAlertas] = useState([]);
+  const [notificacoesNaoLidas, setNotificacoesNaoLidas] = useState(0);
+  const ultimoIdAlerta = useRef<number | null>(null);
 
   const filtros = ['Hora', 'Dia', 'Semana'];
 
   // ==========================================
-  // FUNÇÃO DE BUSCA (BACKEND)
+  // AUTOSELEÇÃO / VALIDAÇÃO DE DASHBOARDS
   // ==========================================
-  const buscarDadosDoServidor = async () => {
+  useEffect(() => {
+    validarEDefinirPlantaUsuario();
+  }, []);
+
+  const validarEDefinirPlantaUsuario = async () => {
     try {
-
-      const url = `http://10.223.48.54:3000/sensor_temp/ultimos_temp?tipo=${tipoVisualizacao}&filtro=${filtroSelecionado}`;
-
-      console.log("Buscando:", tipoVisualizacao);
-
-      const response = await fetch(url);
-      console.log("Status HTTP:", response.status);
-      const json = await response.json();
-      console.log("JSON recebido:", JSON.stringify(json));
-
-      console.log("Dados recebidos:", json);
-
-      if (json && json.length > 0) {
-
-      const valoresFormatados = json.map(
-        (item: any) => Number(item.valor)
-      );
-
-      const labels = json.map(
-        (item: any) => item.ponto_escala
-      );
-
-      let labelsExibicao = [...labels];
-
-      if (filtroSelecionado === "" || filtroSelecionado === "Hora") {
-        const passo = Math.ceil(labels.length / 5);
-
-        labelsExibicao = labels.map((label, index) =>
-          index % passo === 0 ? label : ""
-        );
+      const usuarioSalvo = await AsyncStorage.getItem("usuario");
+      if (!usuarioSalvo) {
+        setPlantaAtiva(null);
+        return;
       }
 
-      setLabelsTemperatura(labelsExibicao);
+      const usuario = JSON.parse(usuarioSalvo);
 
-      setDadosTemperatura([
-          {
-            label:
-              tipoVisualizacao === "enrolamento"
-                ? "Enrolamento"
-                : "Carcaça",
+      const res = await fetch(`${API_URL}/dashboards/usuario/${usuario.id_usuario}`);
+      const dashboardsDoUsuario = await res.json();
 
-            dados: valoresFormatados,
-
-            cor:
-              tipoVisualizacao === "enrolamento"
-                ? "#6C5DD1"
-                : "#6C5DD1"
-          }
-        ]);
+      if (!res.ok || !dashboardsDoUsuario || dashboardsDoUsuario.length === 0) {
+        setPlantaAtiva(null);
+        await AsyncStorage.removeItem("dashboardAtivo");
+        return;
       }
 
+      const aindaTemAcesso = dashboardsDoUsuario.some(
+        (dash: any) => dash.id_dashboard === plantaAtiva?.id_dashboard
+      );
+
+      if (!aindaTemAcesso) {
+        setPlantaAtiva(dashboardsDoUsuario[0]);
+        await AsyncStorage.setItem("dashboardAtivo", JSON.stringify(dashboardsDoUsuario[0]));
+      }
     } catch (error) {
-      console.log("ERRO:", error);
+      console.log("Erro ao validar dashboards do usuário:", error);
+      setPlantaAtiva(null);
     }
   };
 
-  const buscarContagemStatus = async () => {
-      try {
+  // ==========================================
+  // FUNÇÃO AUXILIAR DE AGRUPAMENTO POR MOTOR (USANDO COR DO BANCO)
+  // ==========================================
+  const agruparPorMotor = (json: any[]) => {
+    if (!json || json.length === 0) return { labels: [], linhas: [] };
 
-        const response = await fetch(
-          "http://10.223.48.54:3000/motores/status-contagem"
-        );
+    const labelsUnicas = Array.from(new Set(json.map((i) => i.ponto_escala)));
 
-        const data = await response.json();
+    // Estrutura do mapa para armazenar valores e a cor customizada do motor
+    const motoresMap: { [key: string]: { dados: number[]; cor: string } } = {};
 
-        console.log(
-          "Contagem status:",
-          data
-        );
+    json.forEach((item) => {
+      const nome = item.nome_motor || `Motor ${item.id_motor}`;
+      const cor = item.cor_grafico || '#6C5DD1';
 
-        setContagemStatus({
-          normal: Number(data.normal || 0),
-          alerta: Number(data.alerta || 0),
-          critico: Number(data.critico || 0)
-        });
-
-      } catch (error) {
-
-        console.log(
-          "Erro ao buscar contagem:",
-          error
-        );
-
+      if (!motoresMap[nome]) {
+        motoresMap[nome] = { dados: [], cor: cor };
       }
-    };
+      motoresMap[nome].dados.push(Number(item.valor));
+    });
 
-  const buscarDadosVibracao = async () => {
+    const linhas = Object.keys(motoresMap).map((nomeMotor) => ({
+      label: nomeMotor,
+      dados: motoresMap[nomeMotor].dados,
+      cor: motoresMap[nomeMotor].cor
+    }));
+
+    return { labels: labelsUnicas, linhas };
+  };
+
+  // ==========================================
+  // FUNÇÕES DE BUSCA (BACKEND)
+  // ==========================================
+  const buscarDadosDoServidor = async () => {
+    if (!plantaAtiva?.id_dashboard) {
+      setDadosTemperatura([]);
+      setLabelsTemperatura([]);
+      return;
+    }
     try {
-
-      const response = await fetch(
-        `http://10.223.48.54:3000/sensores/ultimos-grafico?filtro=${filtroSelecionado}`
-      );
-
+      const url = `${API_URL}/sensor_temp/ultimos_temp?tipo=${tipoVisualizacao}&filtro=${filtroSelecionado}&dashboard_id=${plantaAtiva.id_dashboard}`;
+      const response = await fetch(url);
       const json = await response.json();
 
-      console.log("Vibração recebida:", json);
-
       if (json && json.length > 0) {
-
-        const valores = json.map(
-          (item: any) => Number(item.valor)
-        );
-
-        const labels = json.map(
-          (item: any) => item.ponto_escala
-        );
+        const { labels, linhas } = agruparPorMotor(json);
 
         let labelsExibicao = [...labels];
 
         if (filtroSelecionado === "" || filtroSelecionado === "Hora") {
-          const passo = Math.ceil(labels.length / 5);
+          const passo = Math.ceil(labels.length / 5) || 1;
+          labelsExibicao = labels.map((label: string, index: number) =>
+            index % passo === 0 ? label : ""
+          );
+        }
 
-          labelsExibicao = labels.map((label, index) =>
+        setLabelsTemperatura(labelsExibicao);
+        setDadosTemperatura(linhas);
+      } else {
+        setDadosTemperatura([]);
+        setLabelsTemperatura([]);
+      }
+    } catch (error) {
+      console.log("ERRO ao buscar dados do servidor:", error);
+    }
+  };
+
+  const buscarContagemStatus = async () => {
+    if (!plantaAtiva?.id_dashboard) {
+      setContagemStatus({ normal: 0, alerta: 0, critico: 0 });
+      return;
+    }
+    try {
+      const response = await fetch(`${API_URL}/motores/status-contagem?dashboard_id=${plantaAtiva.id_dashboard}`);
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+      setContagemStatus({
+        normal: Number(data.normal || 0),
+        alerta: Number(data.alerta || 0),
+        critico: Number(data.critico || 0)
+      });
+    } catch (error) {
+      console.log("Erro ao buscar contagem:", error);
+    }
+  };
+
+  const buscarDadosVibracao = async () => {
+    if (!plantaAtiva?.id_dashboard) {
+      setDadosVibracao([]);
+      setLabelsVibracao([]);
+      return;
+    }
+    try {
+      const response = await fetch(`${API_URL}/sensores/ultimos-grafico?filtro=${filtroSelecionado}&dashboard_id=${plantaAtiva.id_dashboard}`);
+      const json = await response.json();
+
+      if (json && json.length > 0) {
+        const { labels, linhas } = agruparPorMotor(json);
+
+        let labelsExibicao = [...labels];
+
+        if (filtroSelecionado === "" || filtroSelecionado === "Hora") {
+          const passo = Math.ceil(labels.length / 5) || 1;
+          labelsExibicao = labels.map((label: string, index: number) =>
             index % passo === 0 ? label : ""
           );
         }
 
         setLabelsVibracao(labelsExibicao);
-
-        setDadosVibracao([
-          {
-            label: "Motor 1",
-            dados: valores,
-            cor: "#6C5DD1"
-          }
-        ]);
-
+        setDadosVibracao(linhas);
+      } else {
+        setDadosVibracao([]);
+        setLabelsVibracao([]);
       }
-
     } catch (error) {
-
-      console.log(
-        "Erro ao buscar vibração:",
-        error
-      );
-
+      console.log("Erro ao buscar vibração:", error);
     }
   };
 
   const carregarNotificacoes = async () => {
     try {
-      const valorSalvo =
-        await AsyncStorage.getItem(
-          "notificacoesNaoLidas"
-        );
+      const valorSalvo = await AsyncStorage.getItem("notificacoesNaoLidas");
       if (valorSalvo) {
-        setNotificacoesNaoLidas(
-          Number(valorSalvo)
-        );
+        setNotificacoesNaoLidas(Number(valorSalvo));
       }
-    }
-    catch (error) {
+    } catch (error) {
       console.log(error);
     }
   };
 
-  const insets = useSafeAreaInsets();
-
-  const [alertas, setAlertas] = useState([]);
-
-  const [notificacoesNaoLidas, setNotificacoesNaoLidas] =
-    useState(0);
-
-  const ultimoIdAlerta =
-    useRef<number | null>(null);
-
   const carregarUltimoId = async () => {
     try {
-      const valor =
-        await AsyncStorage.getItem(
-          "ultimoIdAlerta"
-        );
+      const valor = await AsyncStorage.getItem("ultimoIdAlerta");
       if (valor) {
-        ultimoIdAlerta.current =
-          Number(valor);
+        ultimoIdAlerta.current = Number(valor);
       }
     } catch (error) {
       console.log(error);
@@ -235,91 +225,76 @@ export default function HomeScreen() {
   };
 
   const buscarAlertas = async () => {
+    if (!plantaAtiva?.id_dashboard) {
+      setAlertas([]);
+      return;
+    }
     try {
-      const response = await fetch(
-        "http://10.223.48.54:3000/alertas"
-      );
+      const response = await fetch(`${API_URL}/alertas?dashboard_id=${plantaAtiva.id_dashboard}`);
       const data = await response.json();
       setAlertas(data);
       if (!data || data.length === 0) return;
-      // pega maior ID
-      const maiorId = Math.max(
-        ...data.map((item: any) => item.id_alerta)
-      );
-      // PRIMEIRA EXECUÇÃO
+
+      const maiorId = Math.max(...data.map((item: any) => item.id_alerta));
+
       if (ultimoIdAlerta.current === null) {
-        // tenta recuperar último ID salvo
-        const ultimoIdSalvo =
-          await AsyncStorage.getItem(
-            "ultimoIdAlerta"
-          );
+        const ultimoIdSalvo = await AsyncStorage.getItem("ultimoIdAlerta");
         if (ultimoIdSalvo) {
-          ultimoIdAlerta.current =
-            Number(ultimoIdSalvo);
+          ultimoIdAlerta.current = Number(ultimoIdSalvo);
         } else {
           ultimoIdAlerta.current = maiorId;
-          await AsyncStorage.setItem(
-            "ultimoIdAlerta",
-            maiorId.toString()
-          );
+          await AsyncStorage.setItem("ultimoIdAlerta", maiorId.toString());
         }
         return;
       }
-      // chegou alerta novo
+
       if (maiorId > ultimoIdAlerta.current) {
         setNotificacoesNaoLidas((prev) => {
           const novoValor = prev + 1;
-          AsyncStorage.setItem(
-            "notificacoesNaoLidas",
-            novoValor.toString()
-          );
+          AsyncStorage.setItem("notificacoesNaoLidas", novoValor.toString());
           return novoValor;
         });
         ultimoIdAlerta.current = maiorId;
-        await AsyncStorage.setItem(
-          "ultimoIdAlerta",
-          maiorId.toString()
-        );
+        await AsyncStorage.setItem("ultimoIdAlerta", maiorId.toString());
       }
     } catch (error) {
-      console.log(
-        "Erro ao buscar alertas:",
-        error
-      );
+      console.log("Erro ao buscar alertas:", error);
     }
   };
 
   const buscarMotores = async () => {
+    if (!plantaAtiva?.id_dashboard) {
+      setMotores([]);
+      return;
+    }
     try {
-
-      const response = await fetch(
-        "http://10.223.48.54:3000/motores"
-      );
-
+      const response = await fetch(`${API_URL}/motores/dashboard/${plantaAtiva.id_dashboard}`);
       const data = await response.json();
-
-      setMotores(data);
-
+      if (response.ok) setMotores(data);
     } catch (error) {
-
-      console.log(
-        "Erro ao buscar motores:",
-        error
-      );
-
+      console.log("Erro ao buscar motores:", error);
     }
   };
 
-  // Ciclo de vida: Busca os dados ao abrir e atualiza a cada 5 segundos
   useEffect(() => {
     carregarNotificacoes();
     carregarUltimoId();
+
+    if (!plantaAtiva) {
+      setMotores([]);
+      setAlertas([]);
+      setContagemStatus({ normal: 0, alerta: 0, critico: 0 });
+      setDadosTemperatura([]);
+      setDadosVibracao([]);
+      return;
+    }
+
     buscarAlertas();
     buscarMotores();
-
-    buscarDadosDoServidor(); // temperatura
+    buscarDadosDoServidor();
     buscarDadosVibracao();
     buscarContagemStatus();
+
     const intervalo = setInterval(() => {
       buscarAlertas();
       buscarMotores();
@@ -327,259 +302,178 @@ export default function HomeScreen() {
       buscarDadosVibracao();
       buscarContagemStatus();
     }, 2000);
+
     return () => clearInterval(intervalo);
-  }, [tipoVisualizacao, filtroSelecionado]);
+  }, [tipoVisualizacao, filtroSelecionado, plantaAtiva]);
 
   return (
+    <View style={styles.containerPrincipal}>
+      <ScrollView
+        style={styles.mainScroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ESTADO VAZIO */}
+        {!plantaAtiva ? (
+          <View style={styles.emptyContainer}>
+            <MaterialIcons name="dashboard-customize" size={64} color="#6C5DD2" />
+            <Text style={styles.emptyTitle}>Nenhum Dashboard Selecionado</Text>
+            <Text style={styles.emptySubtitle}>
+              Você ainda não possui nenhum dashboard criado ou compartilhado com sua conta.
+            </Text>
 
-  <View style={styles.containerPrincipal}>
-
-    {/* HEADER FIXO */}
-    <View
-      style={[
-        styles.header,
-        { paddingTop: insets.top + 15 }
-      ]}
-    >
-
-      <Text style={styles.text_header}>
-        Dashboard
-      </Text>
-
-      <View style={styles.icons_header}>
-
-        <TouchableOpacity
-          style={styles.notificationButton}
-          onPress={async () => {
-          setModalVisivel(true);
-          setNotificacoesNaoLidas(0);
-          await AsyncStorage.setItem(
-            "notificacoesNaoLidas",
-            "0"
-          );
-        }}
-        >
-          <MaterialIcons
-            name="notifications"
-            size={22}
-            color="#fff"
-          />
-          {notificacoesNaoLidas > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {notificacoesNaoLidas}
-              </Text>
+            <TouchableOpacity
+              style={styles.btnCriarDashboard}
+              onPress={() => router.push("/dashboard_admin")}
+            >
+              <MaterialIcons name="add" size={20} color="#fff" />
+              <Text style={styles.btnCriarText}>Criar dashboard</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          /* CONTEÚDO DO DASHBOARD */
+          <>
+            {/* FILTROS */}
+            <View style={styles.container_filtros}>
+              {filtros.map((item) => (
+                <BotaoFiltro
+                  key={item}
+                  label={item}
+                  isSelected={filtroSelecionado === item}
+                  onPress={() => {
+                    if (filtroSelecionado === item) {
+                      setFiltroSelecionado('');
+                    } else {
+                      setFiltroSelecionado(item);
+                    }
+                  }}
+                  style={styles.buttonFiltroTempo}
+                />
+              ))}
             </View>
-          )}
 
-        </TouchableOpacity>
+            {/* CARDS STATUS */}
+            <View style={styles.statusRow}>
+              <CardStatus
+                label="Normal"
+                icon={require('../../assets/images/icone_normal_cinza.png')}
+                data={contagemStatus.normal}
+              />
 
-      </View>
+              <CardStatus
+                label="Alerta"
+                icon={require('../../assets/images/icone_alerta.png')}
+                data={contagemStatus.alerta}
+              />
 
-    </View>
+              <CardStatus
+                label="Crítico"
+                icon={require('../../assets/images/icone_critico.png')}
+                data={contagemStatus.critico}
+              />
+            </View>
 
-    {/* CONTEÚDO SCROLLÁVEL */}
-    <ScrollView
-      style={styles.mainScroll}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
+            {/* BOTÕES CARCAÇA / ENROLAMENTO */}
+            <View style={styles.botoesContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.botaoVisualizacao,
+                  tipoVisualizacao === "carcaca" && styles.botaoAtivo
+                ]}
+                onPress={() => setTipoVisualizacao("carcaca")}
+              >
+                <Text
+                  style={[
+                    styles.botaoTexto,
+                    tipoVisualizacao === "carcaca" && styles.botaoTextoAtivo
+                  ]}
+                >
+                  Carcaça (Real)
+                </Text>
+              </TouchableOpacity>
 
-      {/* FILTROS */}
-      <View style={styles.container_filtros}>
-        {filtros.map((item) => (
-          <BotaoFiltro
-            key={item}
-            label={item}
-            isSelected={filtroSelecionado === item}
-            onPress={() => {
-              // Se clicar no que já está selecionado, limpa o filtro (Tempo Real)
-              if (filtroSelecionado === item) {
-                setFiltroSelecionado('');
-              } else {
-                setFiltroSelecionado(item);
+              <TouchableOpacity
+                style={[
+                  styles.botaoVisualizacao,
+                  tipoVisualizacao === "enrolamento" && styles.botaoAtivo
+                ]}
+                onPress={() => setTipoVisualizacao("enrolamento")}
+              >
+                <Text
+                  style={[
+                    styles.botaoTexto,
+                    tipoVisualizacao === "enrolamento" && styles.botaoTextoAtivo
+                  ]}
+                >
+                  Enrolamento (Estimado)
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* GRÁFICOS */}
+            <CardGrafico
+              titulo={
+                tipoVisualizacao === "enrolamento"
+                  ? "Temperatura do Enrolamento (Estimada)"
+                  : "Temperatura da Carcaça (Real)"
               }
-            }}
-            style={styles.buttonFiltroTempo}
-          />
-        ))}
-      </View>
+              linhas={dadosTemperatura}
+              labels={labelsTemperatura}
+            />
 
-      {/* CARDS */}
-      <View style={styles.statusRow}>
-        <CardStatus
-          label="Normal"
-          icon={require('../../assets/images/icone_normal_cinza.png')}
-          data={contagemStatus.normal}
-        />
+            <CardGrafico
+              titulo="Vibração (m/s²)"
+              linhas={dadosVibracao}
+              labels={labelsVibracao}
+            />
 
-        <CardStatus
-          label="Alerta"
-          icon={require('../../assets/images/icone_alerta.png')}
-          data={contagemStatus.alerta}
-        />
+            {/* ALERTAS */}
+            <View style={styles.container_alerta_motores}>
+              <Text style={styles.text_alertas}>Alertas ativos</Text>
 
-        <CardStatus
-          label="Crítico"
-          icon={require('../../assets/images/icone_critico.png')}
-          data={contagemStatus.critico}
-        />
-      </View>
+              {motores.map((motor: any) => (
+                <MotorCardAlert
+                  key={motor.id_motor}
+                  nome={motor.nome_motor}
+                  localizacao_setor={motor.localizacao}
+                  status_vibracao={motor.status_vibracao}
+                  status_temperatura={motor.status_temperatura}
+                  valor_vibracao={motor.valor_vibracao}
+                  valor_temp={motor.valor_temp}
+                />
+              ))}
+            </View>
+          </>
+        )}
+      </ScrollView>
 
-      <View style={styles.botoesContainer}>
-
-        <TouchableOpacity
-          style={[
-            styles.botaoVisualizacao,
-            tipoVisualizacao === "carcaca" &&
-              styles.botaoAtivo
-          ]}
-          onPress={() =>
-            setTipoVisualizacao("carcaca")
-          }
-        >
-
-          <Text
-            style={[
-              styles.botaoTexto,
-              tipoVisualizacao === "carcaca" &&
-                styles.botaoTextoAtivo
-            ]}
-          >
-            Carcaça (Real)
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.botaoVisualizacao,
-            tipoVisualizacao === "enrolamento" &&
-              styles.botaoAtivo
-          ]}
-          onPress={() =>
-            setTipoVisualizacao("enrolamento")
-          }
-        >
-
-          <Text
-            style={[
-              styles.botaoTexto,
-              tipoVisualizacao === "enrolamento" &&
-                styles.botaoTextoAtivo
-            ]}
-          >
-            Enrolamento (Estimado)
-          </Text>
-        </TouchableOpacity>
-
-      </View>
-
-      {/* GRÁFICOS */}
-      <CardGrafico
-        titulo={
-          tipoVisualizacao === "enrolamento"
-            ? "Temperatura do Enrolamento (Estimada)"
-            : "Temperatura da Carcaça (Real)"
-        }
-        linhas={dadosTemperatura}
-        labels={labelsTemperatura}
-      />
-
-      <CardGrafico
-        titulo="Vibração (m/s²)"
-        linhas={dadosVibracao}
-        labels={labelsVibracao}
-      />
-
-      {/* ALERTAS */}
-      <View style={styles.container_alerta_motores}>
-
-        <Text style={styles.text_alertas}>
-          Alertas ativos
-        </Text>
-
-        {motores.map((motor) => (
-
-          <MotorCardAlert
-            key={motor.id_motor}
-            nome={motor.nome_motor}
-            localizacao_setor={motor.localizacao}
-
-            status_vibracao={motor.status_vibracao}
-            status_temperatura={motor.status_temperatura}
-
-            valor_vibracao={motor.valor_vibracao}
-            valor_temp={motor.valor_temp}
-          />
-
-        ))}
-
-      </View>
-
-    </ScrollView>
-
-    <NotificationModal
-      visible={modalVisivel}
-      onClose={() => setModalVisivel(false)}
-      alertas={alertas}
-    />
-
-    {/* BOTTOM BAR */}
-    {Platform.OS !== "web" && <BottomBar />}
-
-  </View>
-);
+      {/* BOTTOM BAR */}
+      {Platform.OS !== "web" && <BottomBar />}
+    </View>
+  );
 }
 
 // ==========================================
 // ESTILOS
 // ==========================================
 const styles = StyleSheet.create({
-
   mainScroll: {
     flex: 1,
     backgroundColor: '#000510',
   },
-
   containerPrincipal: {
-  flex: 1,
-  backgroundColor: "#000510",
-},
-
-scrollContent: {
-  alignItems: "center",
-  
-},
-
-  header: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#505050',
-    width: '100%',
-    paddingTop: 35,
-    paddingBottom: 20,
-    paddingHorizontal: 25,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flex: 1,
+    backgroundColor: "#000510",
   },
-
-  icones_header: {
-    flexDirection: 'row',
+  scrollContent: {
+    alignItems: "center",
   },
-
-  text_header: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-
   botoesContainer: {
     flexDirection: 'row',
     width: '91%',
     gap: 12,
     marginBottom: 15,
   },
-
   botaoVisualizacao: {
     flex: 1,
     flexDirection: 'row',
@@ -593,37 +487,31 @@ scrollContent: {
     paddingVertical: 12,
     paddingHorizontal: 10,
   },
-
   botaoAtivo: {
     backgroundColor: '#6C5DD2',
     borderColor: '#6C5DD2',
   },
-
   botaoTexto: {
     color: '#aaa',
     fontSize: 13,
     fontWeight: 'bold',
   },
-
   botaoTextoAtivo: {
     color: '#ffffff',
   },
-
   container_filtros: {
     flexDirection: 'row',
-    marginTop: 20,
+    marginTop: 10,
     marginBottom: 25,
     marginLeft: 10,
     width: '92%',
     justifyContent: 'flex-start',
   },
-
   buttonFiltroTempo: {
     width: 80,
     height: 40,
     borderRadius: 18,
   },
-
   statusRow: {
     flexDirection: 'row',
     gap: 12,
@@ -631,173 +519,59 @@ scrollContent: {
     width: '92%',
     justifyContent: 'center'
   },
-
-  container_alerta_motores:{
-  width: '91%',
-  borderRadius: 24,
-  backgroundColor: '#050B18',
-  borderColor: '#505050',
-  borderWidth: 1,
-  paddingBottom: 15,
-  marginTop: 12,
-  marginBottom: 30,
-},
-
-  text_alertas:{
-  color: '#fff',
-  fontSize: 18,
-  fontWeight: 'bold',
-  alignSelf: 'flex-start',
-  marginLeft: 20,
-  marginTop: 25,
-  marginBottom: 20
-},
-
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-  },
-
-  modalContent: {
-    width: '96%',
-    height: '92.5%',
-    backgroundColor: '#0C101A',
-    borderWidth: 1,
+  container_alerta_motores: {
+    width: '91%',
+    borderRadius: 24,
+    backgroundColor: '#050B18',
     borderColor: '#505050',
-    borderTopLeftRadius: 15,
-    flexDirection: "column",
+    borderWidth: 1,
+    paddingBottom: 15,
+    marginTop: 12,
+    marginBottom: 30,
   },
-
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  text_alertas: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    alignSelf: 'flex-start',
+    marginLeft: 20,
+    marginTop: 25,
+    marginBottom: 20
+  },
+  emptyContainer: {
     alignItems: 'center',
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-    paddingBottom: 10,
-    padding: 15,
-    width: '100%'
+    justifyContent: 'center',
+    paddingHorizontal: 30,
+    width: '90%',
+    marginTop: "60%",
   },
-
-  modalTitle: {
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    color: '#94a3b8',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  btnCriarDashboard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6C5DD2',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    gap: 8,
+  },
+  btnCriarText: {
     color: '#fff',
     fontSize: 15,
     fontWeight: 'bold',
-    marginLeft: 5
   },
-
-  notificacaoItem: {
-    flexDirection: 'row',
-    alignItems: 'center', // Alinha verticalmente no centro
-    backgroundColor: '#161b26',
-    padding: 15,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ca2020',
-    margin: 10,
-    gap: 10, // Espaço entre a imagem e o texto
-
-  },
-
-  badge: {
-  position: "absolute",
-  right: -8,
-  top: -8,
-  backgroundColor: "#ef4444",
-  width: 20,
-  height: 20,
-  borderRadius: 10,
-  justifyContent: "center",
-  alignItems: "center",
-},
-
-badgeText: {
-  color: "#fff",
-  fontSize: 11,
-  fontWeight: "bold",
-},
-
-  notificacaoTexto: {
-    color: '#fff',
-    fontSize: 14,
-  },
-
-  notificationButton: {
-    position: "relative",
-  },
-
-  notificacaoHora: {
-    color: '#aaa',
-    fontSize: 11,
-    marginTop: 5,
-  },
-
-  triangle: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderBottomWidth: 15,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    position: 'absolute',
-    top: -15,
-    right: 25,
-  },
-
-  triangleBorder: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 10,  
-    borderRightWidth: 10,
-    borderBottomWidth: 15,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: '#505050',
-    position: 'absolute',
-    top: -15,
-    right: 20,
-    zIndex: 1,
-
-  },
-
-  triangleInner: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 9,   // 1px menor que o de trás
-    borderRightWidth: 9,  // 1px menor que o de trás
-    borderBottomWidth: 14, // 1px menor que o de trás
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: '#0C101A', // COR DO FUNDO DO MODAL
-    position: 'absolute',
-    top: -14, // 1px abaixo do triângulo de borda
-    right: 21, // Centralizado (20 + 1px de diferença da borda)
-    zIndex: 2, // Fica na frente
-
-  },
-
-  icone_status_notificacoes:{
-    width: 15,
-    height: 15,
-    marginTop: -20,
-    marginLeft: 30
-
-  },
-
-  icons_header:{
-    display: "flex",
-    flexDirection: "row",
-    gap: 20
-  }
-
-
 });

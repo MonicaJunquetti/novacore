@@ -14,22 +14,46 @@ const pool = mysql.createPool({
 
 router.get('/status-contagem', async (req, res) => {
   try {
-    // 1. Criamos as promessas usando a variável 'pool' correta
-    const qNormalVibra = pool.query("SELECT COUNT(*) AS total FROM tb_status_motor WHERE estado = 'ok'");
-    const qNormalTemp  = pool.query("SELECT COUNT(*) AS total FROM tb_status_temp WHERE estado = 'ok'");
+    const { dashboard_id } = req.query;
 
-    const qAlertaVibra = pool.query("SELECT COUNT(*) AS total FROM tb_status_motor WHERE estado = 'alerta'");
-    const qAlertaTemp  = pool.query("SELECT COUNT(*) AS total FROM tb_status_temp WHERE estado = 'alerta'");
+    let joinDashboard = "";
+    let whereClause = "";
+    let queryParams = [];
+
+    if (dashboard_id) {
+      joinDashboard = " INNER JOIN tb_motores m ON s.fk_motor = m.id_motor ";
+      whereClause = " AND m.fk_dashboard = ? ";
+      queryParams = [dashboard_id];
+    }
+
+    // Queries dinâmicas filtrando por dashboard quando enviado
+    const qNormalVibra = pool.query(
+      `SELECT COUNT(*) AS total FROM tb_status_motor s ${joinDashboard} WHERE s.estado = 'ok' ${whereClause}`,
+      queryParams
+    );
+    const qNormalTemp = pool.query(
+      `SELECT COUNT(*) AS total FROM tb_status_temp s ${joinDashboard} WHERE s.estado = 'ok' ${whereClause}`,
+      queryParams
+    );
+
+    const qAlertaVibra = pool.query(
+      `SELECT COUNT(*) AS total FROM tb_status_motor s ${joinDashboard} WHERE s.estado = 'alerta' ${whereClause}`,
+      queryParams
+    );
+    const qAlertaTemp = pool.query(
+      `SELECT COUNT(*) AS total FROM tb_status_temp s ${joinDashboard} WHERE s.estado = 'alerta' ${whereClause}`,
+      queryParams
+    );
 
     const qCriticoVibra = pool.query(
-    "SELECT COUNT(*) AS total FROM tb_status_motor WHERE estado = 'erro'"
+      `SELECT COUNT(*) AS total FROM tb_status_motor s ${joinDashboard} WHERE s.estado = 'erro' ${whereClause}`,
+      queryParams
     );
-
     const qCriticoTemp = pool.query(
-    "SELECT COUNT(*) AS total FROM tb_status_temp WHERE estado = 'erro'"
+      `SELECT COUNT(*) AS total FROM tb_status_temp s ${joinDashboard} WHERE s.estado = 'erro' ${whereClause}`,
+      queryParams
     );
 
-    // 2. Executamos em paralelo
     const [
       resNormVibra, resNormTemp,
       resAlerVibra, resAlerTemp,
@@ -40,7 +64,6 @@ router.get('/status-contagem', async (req, res) => {
       qCriticoVibra, qCriticoTemp
     ]);
 
-    // 3. Estrutura correta para extrair dados no pacote mysql2: [rows]
     const nVibra = Number(resNormVibra[0][0].total);
     const nTemp  = Number(resNormTemp[0][0].total);
 
@@ -50,16 +73,6 @@ router.get('/status-contagem', async (req, res) => {
     const cVibra = Number(resCritVibra[0][0].total);
     const cTemp  = Number(resCritTemp[0][0].total);
 
-    console.log({
-    nVibra,
-    nTemp,
-    aVibra,
-    aTemp,
-    cVibra,
-    cTemp
-    });
-
-    // 4. Retorno limpo para o front-end
     return res.json({
       normal: nVibra + nTemp,
       alerta: aVibra + aTemp,

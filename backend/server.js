@@ -22,7 +22,13 @@ const alertasRoutes = require("./routes/alertas");
 app.use("/alertas", alertasRoutes);
 
 const motoresStatusRoutes = require("./routes/motores_status");
-app.use("/motores", motoresStatusRoutes);
+app.use("/motores_status", motoresStatusRoutes); // Corrigido prefixo duplicado
+
+const dashboardsRoutes = require("./routes/dashboards");
+app.use("/dashboards", dashboardsRoutes);
+
+const chatRoutes = require("./routes/chat");
+app.use("/chat", chatRoutes);
 
 app.listen(3000, () => {
   console.log("Servidor rodando na porta 3000");

@@ -1,88 +1,90 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
+import { View, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 type Props = {
-  telaAtiva: string;
+  telaAtiva?: string;
 };
 
-const router = useRouter();
+export default function Sidebar({ telaAtiva }: Props) {
+  const router = useRouter(); // 👈 Movido para dentro do componente
 
-export default function Sidebar() {
   return (
     <View style={styles.sidebar}>
-      
       <View style={styles.top}>
-        <Image 
-          source={require("../assets/images/logo.png")} 
-          style={styles.logo} 
+        <Image
+          source={require("../assets/images/logo.png")}
+          style={styles.logo}
         />
 
-        <TouchableOpacity 
-          style={styles.item}
+        {/* DASHBOARD */}
+        <TouchableOpacity
+          style={[styles.item, telaAtiva === "dashboard" && styles.itemAtivo]}
           onPress={() => router.push("/dashboard")}
         >
           <MaterialIcons name="dashboard" size={24} color="#fff" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.item}>
+        {/* MOTORES */}
+        <TouchableOpacity
+          style={[styles.item, telaAtiva === "motores" && styles.itemAtivo]}
+          onPress={() => router.push("/motores")}
+        >
           <MaterialIcons name="my-location" size={24} color="#fff" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.item}>
+        {/* PERFIL */}
+        <TouchableOpacity
+          style={[styles.item, telaAtiva === "perfil" && styles.itemAtivo]}
+          onPress={() => router.push("/perfil")}
+        >
           <MaterialIcons name="person" size={24} color="#fff" />
         </TouchableOpacity>
-      </View>
 
+        {/* PAINEL ADMIN / GESTÃO DE PLANTAS */}
+        <TouchableOpacity
+          style={[styles.item, telaAtiva === "admin" && styles.itemAtivo]}
+          onPress={() => router.push("/dashboard_admin")}
+        >
+          <MaterialIcons name="admin-panel-settings" size={24} color="#6C5DD2" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   sidebar: {
-    width: 100,
+    width: 90,
     backgroundColor: "#020617",
-    padding: 20,
+    paddingVertical: 20,
     alignItems: "center",
     borderRightWidth: 1,
-    borderRightColor: "#505050",
+    borderRightColor: "#1e293b",
     justifyContent: "space-between",
   },
-
   top: {
     alignItems: "center",
+    width: "100%",
   },
-
-  bottom: {
-    alignItems: "center",
-  },
-
-  titulo: {
-    color: "#fff",
-    fontSize: 20,
-    marginBottom: 20,
-    fontWeight: "bold",
-  },
-
-  
   logo: {
-    width: 60,
-    height: 60,
+    width: 50,
+    height: 50,
     resizeMode: "contain",
-    marginBottom: 46,
+    marginBottom: 40,
     alignSelf: "center",
   },
-
   item: {
-    flexDirection: "row",
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: "center",
     alignItems: "center",
-    gap: 10,
-    marginBottom: 35,
+    marginBottom: 20,
   },
-
-  texto: {
-    color: "#fff",
-    fontSize: 16,
+  itemAtivo: {
+    backgroundColor: "rgba(108, 93, 210, 0.2)",
+    borderWidth: 1,
+    borderColor: "#6C5DD2",
   },
-
 });
